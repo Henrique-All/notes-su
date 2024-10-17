@@ -45,6 +45,7 @@ export default createGlobalStyle`
 
 
   html {
+    background-color: #363432;
      // Scroll
   ::-webkit-scrollbar {
     width: 10px;
