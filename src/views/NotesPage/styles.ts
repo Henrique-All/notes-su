@@ -3,7 +3,7 @@ import styled from 'styled-components'
 export const NotesContent = styled.div`
   display: flex;
   flex-direction: column;
-  width: 100%;
+  width: 95%;
   align-items: center;
   margin-top: 50px;
 
