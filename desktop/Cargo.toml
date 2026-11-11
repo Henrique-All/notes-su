@@ -1,0 +1,114 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/notes-core",
+    "crates/notes-crypto",
+    "crates/notes-store",
+    "crates/notes-api-client",
+    "crates/notes-gpui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+
+[workspace.dependencies]
+# Internal workspace crates
+notes-core = { path = "crates/notes-core" }
+notes-crypto = { path = "crates/notes-crypto" }
+notes-store = { path = "crates/notes-store" }
+notes-api-client = { path = "crates/notes-api-client" }
+
+# GPUI Desktop UI (pins gpui-pre =0.3.12 + gpui-pre-platform =0.3.12 + gpui-component 0.9.1)
+gpui-kit = { version = "0.9.1", features = ["syntect"] }
+
+# Core serialization, error handling, time & IDs
+anyhow = "1.0.104"
+thiserror = "2.0.21"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+serde_yaml_ng = "0.10.0"
+chrono = { version = "0.4.45", features = ["serde"] }
+uuid = { version = "1.29.2", features = ["v4", "v5", "serde"] }
+
+# Content, Markdown, Diff, CSV, Regex, URL, Unicode & CLI
+pulldown-cmark = { version = "0.13.6", default-features = false, features = ["html"] }
+similar = { version = "3.2.1", features = ["inline", "unicode"] }
+csv = "1.4.0"
+regex = "1.13.1"
+url = "2.5.8"
+unicode-normalization = "0.1.26"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+
+# Local SQLite + FTS5 Storage (bundled SQLite >= 3.45 w/ FTS5, JSON1, FK, THREADSAFE=1)
+rusqlite = { version = "0.41.1", features = ["bundled", "chrono", "serde_json", "uuid", "functions"] }
+
+# Synchronous HTTP + Multipart + Streaming SSE Client
+ureq = { version = "3.5.1", features = ["json", "multipart"] }
+
+# Zero-Knowledge Vault Cryptography (Argon2id + XChaCha20-Poly1305)
+argon2 = { version = "0.6.0", features = ["zeroize"] }
+chacha20poly1305 = { version = "0.11.0", features = ["zeroize"] }
+rand = "0.10.3"
+zeroize = { version = "1.9.1", features = ["derive"] }
+base64 = "0.23.1"
+sha2 = "0.11.1"
+hex = "0.4.3"
+
+# Dev / Temporary File Isolation
+tempfile = "3.27.0"
+
+# VM Memory, Disk & KDF/Render Performance Safeguards
+[profile.dev]
+debug = 0
+
+[profile.test]
+debug = 0
+
+[profile.dev.package.gpui-pre]
+opt-level = 3
+
+[profile.test.package.gpui-pre]
+opt-level = 3
+
+[profile.dev.package.resvg]
+opt-level = 3
+
+[profile.test.package.resvg]
+opt-level = 3
+
+[profile.dev.package.taffy]
+opt-level = 3
+
+[profile.test.package.taffy]
+opt-level = 3
+
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.test.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
+
+[profile.test.package.blake2]
+opt-level = 3
+
+[profile.dev.package.chacha20]
+opt-level = 3
+
+[profile.test.package.chacha20]
+opt-level = 3
+
+[profile.dev.package.chacha20poly1305]
+opt-level = 3
+
+[profile.test.package.chacha20poly1305]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+strip = "symbols"

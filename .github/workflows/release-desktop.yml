@@ -1,0 +1,129 @@
+name: Build & Release Desktop (GPUI)
+
+on:
+  push:
+    branches:
+      - feat/gpui-desktop-release
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  APP_VERSION: "0.1.0"
+
+jobs:
+  windows-x64:
+    name: Windows x64 (.exe Installer + Portable .zip)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure MSVC & Windows SDK environment (cl, link, fxc)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust workspace dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "desktop -> target"
+
+      - name: Validate core, crypto & SQLite FTS5 store tests
+        working-directory: desktop
+        run: cargo test -p notes-core -p notes-crypto -p notes-store --locked
+
+      - name: Build release binary (notes-gpui.exe)
+        working-directory: desktop
+        run: cargo build --release -p notes-gpui --locked
+
+      - name: Package Portable .zip and Windows Setup .exe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+
+          @"
+          notes-su Desktop v$env:APP_VERSION (Rust + GPUI)
+          =================================================
+
+          - Banco local SQLite WAL + FTS5 salvo automaticamente em:
+            %LOCALAPPDATA%\notes-su\notes.db
+          - Atalhos rapidos:
+            Ctrl+N : Nova nota
+            Ctrl+S : Salvar nota atual
+            Ctrl+E : Alternar entre Editor Markdown e Preview interativo
+            Ctrl+Q : Sair
+          "@ | Set-Content -Path dist/LEIA-ME.txt -Encoding UTF8
+
+          $portableDir = "dist/notes-su-portable-$env:APP_VERSION-windows-x64"
+          New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
+          Copy-Item "desktop/target/release/notes-gpui.exe" -Destination "$portableDir/notes-gpui.exe"
+          Copy-Item "dist/LEIA-ME.txt" -Destination "$portableDir/LEIA-ME.txt"
+          Compress-Archive -Path "$portableDir/*" -DestinationPath "dist/notes-su-portable-$env:APP_VERSION-windows-x64.zip" -Force
+
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          & $iscc "desktop\installer\windows\notes-su.iss"
+
+          $hashes = Get-ChildItem -Path dist -Filter "notes-su-*" -File | ForEach-Object {
+            $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$h  $($_.Name)"
+          }
+          $hashes | Set-Content -Path dist/SHA256SUMS.txt -Encoding UTF8
+          Get-ChildItem -Path dist -File
+
+      - name: Upload GitHub Actions Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: notes-su-windows-x64
+          path: |
+            dist/notes-su-setup-*.exe
+            dist/notes-su-portable-*.zip
+            dist/SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "v$env:APP_VERSION" }
+          $assets = @(
+            "dist/notes-su-setup-$env:APP_VERSION-x64.exe",
+            "dist/notes-su-portable-$env:APP_VERSION-windows-x64.zip",
+            "dist/SHA256SUMS.txt"
+          )
+          $notes = @"
+          ## notes-su Desktop $tag (Rust + GPUI — Windows x64)
+
+          Cliente desktop nativo inspirado no Notesnook com interface de 3 colunas (GPUI), busca local instantânea (SQLite WAL + FTS5) e Cofre Zero-Knowledge (Argon2id + XChaCha20-Poly1305).
+
+          ### Downloads para Windows (64 bits)
+          - **notes-su-setup-$env:APP_VERSION-x64.exe** — Instalador recomendado (Menu Iniciar, ícone opcional na Área de Trabalho e desinstalador padrão do Windows; não exige administrador).
+          - **notes-su-portable-$env:APP_VERSION-windows-x64.zip** — Versão portátil (notes-gpui.exe), basta extrair e abrir.
+          - **SHA256SUMS.txt** — Checksums SHA-256 dos pacotes.
+          "@
+
+          $ErrorActionPreference = "Continue"
+          gh release view $tag *> $null
+          $releaseExists = ($LASTEXITCODE -eq 0)
+          $ErrorActionPreference = "Stop"
+
+          if ($releaseExists) {
+            gh release upload $tag @assets --clobber
+          } else {
+            gh release create $tag @assets `
+              --target "${{ github.sha }}" `
+              --title "notes-su Desktop $tag (Windows x64)" `
+              --notes $notes
+          }

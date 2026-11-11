@@ -1,0 +1,21 @@
+[package]
+name = "notes-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+chrono.workspace = true
+csv.workspace = true
+pulldown-cmark.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+sha2.workspace = true
+similar.workspace = true
+thiserror.workspace = true
+unicode-normalization.workspace = true
+url.workspace = true
+uuid.workspace = true
